@@ -8,11 +8,17 @@ import {
   statePath,
 } from "./profile.js";
 
-// Matches the runner loop process in `ps` output across all install shapes:
-//   dev (tsx):       …/apps/runner/src/index.ts
-//   dev (built):     …/apps/runner/dist/index.js
-//   npm global:      …/cronforclaude-runner/dist/index.js
-const RUNNER_PATTERN = /(cronforclaude-runner|apps\/runner)\/(dist|src)\/(index|run)/;
+// Matches the runner loop process in `ps` output across install shapes:
+//   dev (tsx):    …/apps/runner/src/index.ts run …
+//   dev (built):  …/apps/runner/dist/index.js run …
+//   npm global:   node …/bin/cronforclaude run …
+// For a global install the loop process runs the bin symlink — argv[1] is
+// …/bin/cronforclaude, NOT the package realpath — so the path-based first
+// alternative never matches. The `cronforclaude run` alternative covers it.
+// Both shapes always carry the `run` subcommand; `daemon` invocations are
+// excluded separately by the caller so `status` doesn't detect itself.
+const RUNNER_PATTERN =
+  /(cronforclaude-runner|apps\/runner)\/(dist|src)\/(index|run)|[/ ]cronforclaude run\b/;
 
 type Instance = {
   profile: string;

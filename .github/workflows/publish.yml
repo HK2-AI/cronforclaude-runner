@@ -1,0 +1,77 @@
+name: publish
+
+# Publishes cronforclaude-runner to npm when a `vX.Y.Z` tag is pushed to the
+# public repo (github.com/HK2-AI/cronforclaude-runner). The tag must match
+# package.json::version.
+#
+# SOURCE OF TRUTH: this file is maintained in the cronforclaude monorepo at
+# apps/runner/.github/workflows/publish.yml and mirrored into the public repo
+# by scripts/mirror-runner.sh. It is INERT in the monorepo (GitHub only runs
+# workflows under the repo-root .github/) — edit it in the monorepo, never
+# directly in the public repo.
+#
+# Auth: npm Trusted Publishing (OIDC) — NO stored token. Register once:
+#   npmjs.com -> cronforclaude-runner -> Settings -> Trusted Publishing
+#   -> add GitHub Actions:
+#        repo     = HK2-AI/cronforclaude-runner
+#        workflow = publish.yml
+# Trusted Publishing also stamps build provenance automatically — and since
+# this repo is public, that provenance is verifiable by anyone.
+#
+# Release flow: bump apps/runner/package.json version in the monorepo, commit,
+# then run scripts/mirror-runner.sh — it syncs the public repo and pushes the
+# matching `v<version>` tag, which triggers this workflow.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build the tarball but don't publish."
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # required for npm Trusted Publishing (OIDC) + provenance
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      # node 20 ships npm 10.x; Trusted Publishing needs npm >= 11.5.1.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Build
+        run: npm run build
+
+      - name: Tag matches package.json version
+        if: github.event_name == 'push'
+        run: |
+          pkg="$(node -p "require('./package.json').version")"
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$pkg" != "$tag" ]; then
+            echo "::error::tag '$GITHUB_REF_NAME' does not match package.json version '$pkg'"
+            exit 1
+          fi
+
+      - name: Pack (sanity)
+        run: npm pack --dry-run
+
+      # No NODE_AUTH_TOKEN — npm detects the GitHub OIDC environment and
+      # authenticates via the registered Trusted Publisher. Provenance is
+      # attached automatically when publishing this way.
+      - name: Publish to npm
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: npm publish --access public

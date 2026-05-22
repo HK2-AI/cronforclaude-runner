@@ -1,14 +1,13 @@
 {
   "name": "cronforclaude-runner",
-  "version": "0.1.0",
-  "description": "Independent runner daemon for claude-scheduler. Polls the scheduler API, claims due jobs, runs them locally with your Claude CLI login. Not affiliated with Anthropic.",
+  "version": "0.1.1",
+  "description": "Independent runner daemon for Cron for Claude (cronforclaude.com). Polls the scheduler API, claims due jobs, runs them locally with your Claude CLI login. Not affiliated with Anthropic.",
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=20"
   },
   "bin": {
-    "cronforclaude": "./dist/index.js",
     "cronforclaude": "./dist/index.js"
   },
   "files": [
@@ -38,7 +37,7 @@
     "start": "tsx src/index.ts run",
     "build": "tsc && chmod +x dist/index.js",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@sentry/node": "^8.45.0",

@@ -1,6 +1,6 @@
 # cronforclaude-runner
 
-The runner daemon for [claude-scheduler](https://cronforclaude.com).
+The runner daemon for [Cron for Claude](https://cronforclaude.com).
 A small Node process you install on your own machine — it polls our API,
 claims due jobs, and runs them locally with `claude -p` using your existing
 Claude CLI login. Outbound HTTPS only; nothing inbound.
@@ -83,7 +83,7 @@ Template-unit so one file serves every profile:
 ```ini
 # /etc/systemd/system/cronforclaude@.service
 [Unit]
-Description=claude-scheduler runner (%i)
+Description=cronforclaude runner (%i)
 After=network-online.target
 
 [Service]
@@ -139,8 +139,8 @@ MAX_CONCURRENT_JOBS=1
 ```sh
 git clone https://github.com/HK2-AI/cronforclaude-runner.git
 cd cronforclaude-runner
-pnpm install --frozen-lockfile
-pnpm build
+npm install
+npm run build
 node dist/index.js help
 ```
 

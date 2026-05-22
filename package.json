@@ -1,0 +1,56 @@
+{
+  "name": "cronforclaude-runner",
+  "version": "0.1.0",
+  "description": "Independent runner daemon for claude-scheduler. Polls the scheduler API, claims due jobs, runs them locally with your Claude CLI login. Not affiliated with Anthropic.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "cronforclaude": "./dist/index.js",
+    "cronforclaude": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "homepage": "https://cronforclaude.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HK2-AI/cronforclaude-runner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HK2-AI/cronforclaude-runner/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "scheduler",
+    "cron",
+    "runner",
+    "anthropic"
+  ],
+  "scripts": {
+    "cli": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts run",
+    "build": "tsc && chmod +x dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@sentry/node": "^8.45.0",
+    "dotenv": "^16.4.7",
+    "pino": "^9.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

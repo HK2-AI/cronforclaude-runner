@@ -25,6 +25,10 @@ export type ExecResult = {
 export type FlushFn = (snapshot: {
   stdout: string;
   stderr: string;
+  /** Current in-progress assistant message, assembled from
+   *  --include-partial-messages stream deltas. Transient: drives the live
+   *  activity view, never persisted as a JobEvent. Empty between messages. */
+  liveText: string;
   /** Only set when new events arrived since the previous flush. The server
    *  appends them to JobEvent rows; idempotent via (jobId,idx) primary key. */
   events?: StreamEvent[];
@@ -112,7 +116,10 @@ export function execClaude(opts: {
   const userPickedFormat = extra.some((a, i) => a === "--output-format" || a.startsWith("--output-format=") || (a === "-o" && i + 1 < extra.length));
   const streaming = !userPickedFormat;
   if (streaming) {
-    extra.push("--output-format", "stream-json", "--verbose");
+    // --include-partial-messages streams token-level deltas so the live
+    // activity view updates continuously, instead of only when a whole
+    // message/turn completes (which, on xhigh-effort jobs, can be minutes).
+    extra.push("--output-format", "stream-json", "--include-partial-messages", "--verbose");
   }
   const args = ["-p", opts.prompt, ...extra];
   const child = spawn(config.claudeBin, args, {
@@ -146,16 +153,43 @@ export function execClaude(opts: {
   // as a StreamEvent.
   let lineBuf = "";
   const events: StreamEvent[] = [];
+  // In-progress assistant message, rebuilt from partial stream deltas. Reset
+  // when the matching complete `assistant` event lands (or a new message
+  // starts). Never persisted — purely a live-view signal.
+  let liveText = "";
+
+  /** Fold an --include-partial-messages `stream_event` into `liveText`. */
+  function applyPartialDelta(obj: StreamEvent) {
+    const ev = (obj as { event?: { type?: string; delta?: { type?: string; text?: string; thinking?: string } } }).event;
+    if (!ev) return;
+    if (ev.type === "message_start") {
+      liveText = "";
+    } else if (ev.type === "content_block_delta" && ev.delta) {
+      if (ev.delta.type === "text_delta" && typeof ev.delta.text === "string") {
+        liveText += ev.delta.text;
+      } else if (ev.delta.type === "thinking_delta" && typeof ev.delta.thinking === "string") {
+        liveText += ev.delta.thinking;
+      }
+    }
+  }
 
   function ingestLine(line: string) {
     const trimmed = line.trim();
     if (!trimmed) return;
     try {
       const obj = JSON.parse(trimmed) as StreamEvent;
-      if (obj && typeof obj === "object" && typeof obj.type === "string") {
-        if (events.length < MAX_EVENTS) events.push(obj);
-        else truncatedEvents = true;
+      if (!obj || typeof obj !== "object" || typeof obj.type !== "string") return;
+      // Partial-message events are transient — assembled into `liveText` for
+      // the live view, never stored as JobEvents (the matching complete event
+      // arrives right after and is the durable record).
+      if (obj.type === "stream_event") {
+        applyPartialDelta(obj);
+        return;
       }
+      // A complete assistant message supersedes whatever liveText accumulated.
+      if (obj.type === "assistant") liveText = "";
+      if (events.length < MAX_EVENTS) events.push(obj);
+      else truncatedEvents = true;
     } catch {
       // Not valid JSON — likely a stray log line from a child process. Ignore;
       // the raw stdout already captured it.
@@ -245,6 +279,8 @@ export function execClaude(opts: {
     const snapshot = {
       stdout: finalStdout(),
       stderr: finalStderr(),
+      // Cap the live preview — the full message lands in the completed event.
+      liveText: liveText.slice(-6000),
       ...(newEvents.length > 0 ? { events: newEvents, startIdx } : {}),
     };
     try {

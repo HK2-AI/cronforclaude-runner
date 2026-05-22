@@ -37,13 +37,14 @@ export const api = {
   poll() {
     return call<JobClaim>(API_PATHS.runnerPoll, { method: "POST", body: "{}" });
   },
-  jobLog(id: string, payload: { status?: "running"; stdout?: string; stderr?: string; events?: StreamEvent[]; startIdx?: number }) {
+  jobLog(id: string, payload: { status?: "running"; stdout?: string; stderr?: string; liveText?: string; events?: StreamEvent[]; startIdx?: number }) {
     return call<LogResponse>(API_PATHS.runnerJobLog(id), {
       method: "POST",
       body: JSON.stringify({
         status: payload.status ?? "running",
         stdout: payload.stdout,
         stderr: payload.stderr,
+        liveText: payload.liveText,
         events: payload.events,
         startIdx: payload.startIdx,
       }),

@@ -76,9 +76,9 @@ async function tryClaim(): Promise<boolean> {
     timeoutSec: job.timeoutSec,
     dangerouslySkipPermissions: job.dangerouslySkipPermissions,
     effort: job.effort,
-    flush: async ({ stdout, stderr, events, startIdx }) => {
+    flush: async ({ stdout, stderr, liveText, events, startIdx }) => {
       try {
-        const r = await api.jobLog(job.id, { stdout, stderr, events, startIdx });
+        const r = await api.jobLog(job.id, { stdout, stderr, liveText, events, startIdx });
         return { cancelled: r.cancelled };
       } catch {
         return { cancelled: false };

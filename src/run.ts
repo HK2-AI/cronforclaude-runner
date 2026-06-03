@@ -1,6 +1,7 @@
 import { config } from "./config.js";
 import { api } from "./api.js";
 import { execClaude, type ExecHandle, type ExecResult } from "./exec.js";
+import { setupWorktree } from "./worktree.js";
 
 type InFlight = {
   jobId: string;
@@ -69,9 +70,54 @@ async function tryClaim(): Promise<boolean> {
   const job = claim.job;
   log(`claimed job ${job.id} (${job.prompt.slice(0, 60).replace(/\n/g, " ")}...)`);
 
+  // If the server asked for an isolated worktree, set it up BEFORE we hand
+  // execClaude a workingDir. Failures here become job failures — running
+  // in the original workingDir would defeat the user's opt-in for
+  // isolation, so we surface the setup error instead of silently falling
+  // back.
+  let cwd: string | null = job.workingDir;
+  let cleanupWorktree: (() => void) | null = null;
+  if (job.useWorktree) {
+    if (!job.workingDir) {
+      log(`job ${job.id} -> failed (useWorktree requires a workingDir)`);
+      await api
+        .jobResult(job.id, {
+          status: "failed",
+          exitCode: null,
+          stdout: "",
+          stderr: "",
+          error:
+            "useWorktree=true but the schedule has no workingDir. Set workingDir on the schedule or its project to a git repository.",
+        })
+        .catch(() => {});
+      return true; // count as "did something" so the poll loop tightens up
+    }
+    try {
+      const wt = setupWorktree(job.workingDir, job.id, job.worktreeBranch);
+      cwd = wt.cwd;
+      cleanupWorktree = wt.cleanup;
+      log(
+        `job ${job.id} worktree: ${wt.cwd} ` +
+          `(branch=${job.worktreeBranch ?? "HEAD"})`,
+      );
+    } catch (e) {
+      log(`job ${job.id} -> failed (worktree setup: ${(e as Error).message})`);
+      await api
+        .jobResult(job.id, {
+          status: "failed",
+          exitCode: null,
+          stdout: "",
+          stderr: "",
+          error: (e as Error).message,
+        })
+        .catch(() => {});
+      return true;
+    }
+  }
+
   const handle = execClaude({
     prompt: job.prompt,
-    workingDir: job.workingDir,
+    workingDir: cwd,
     claudeArgs: job.claudeArgs,
     timeoutSec: job.timeoutSec,
     dangerouslySkipPermissions: job.dangerouslySkipPermissions,
@@ -114,6 +160,14 @@ async function tryClaim(): Promise<boolean> {
         })
         .catch(() => {});
     } finally {
+      // Tear the worktree down whatever the outcome — success, failure,
+      // or cancel. Synchronous + idempotent so we don't await it from
+      // a possibly-cancelled context.
+      try {
+        cleanupWorktree?.();
+      } catch {
+        /* logged inside; never surfaces here */
+      }
       inFlight.delete(job.id);
     }
   })();

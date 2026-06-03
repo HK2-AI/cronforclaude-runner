@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  cronforclaude-runner macOS LaunchAgent template.
+
+  This runs the runner in the FOREGROUND under launchd's supervision —
+  launchd is the process manager, so do NOT use `cronforclaude daemon start`
+  here. The plain `run` subcommand is the foreground loop.
+
+  Install:
+    1. Copy this file to ~/Library/LaunchAgents/com.cronforclaude.runner.plist
+    2. Replace EVERY occurrence of REPLACE_ME_* below with the correct value.
+    3. launchctl load -w ~/Library/LaunchAgents/com.cronforclaude.runner.plist
+
+  Notes:
+    - This template assumes a single "default" profile. To run multiple
+      profiles, duplicate the file with a unique Label (e.g.
+      com.cronforclaude.runner.work) and unique log paths.
+    - ProgramArguments[0] must be the absolute path to a Node 20+ binary.
+      Find yours with `which node` — on Apple Silicon Homebrew it's usually
+      /opt/homebrew/bin/node, on Intel it's /usr/local/bin/node.
+    - The runner needs a logged-in `claude` CLI on PATH. launchd by default
+      gives jobs a sparse PATH; if `claude` isn't found, set CLAUDE_BIN below
+      to its absolute path (output of `which claude`).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.cronforclaude.runner</string>
+
+    <!-- Auto-restart on crash. -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Start at user-login (the agent runs in the per-user domain). -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Throttle restarts to once every 10s if it crashes in a loop. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <!--
+      ProgramArguments:
+        [0] = absolute path to node 20+
+        [1] = absolute path to the cronforclaude CLI entrypoint
+              - npm global install: /usr/local/bin/cronforclaude
+                (or /opt/homebrew/bin/cronforclaude on Apple Silicon)
+              - from-source build: /path/to/cronforclaude-runner/dist/index.js
+        [2] = "run" (foreground; daemon mode is for non-launchd use)
+        [3] = profile name (matches your ~/.cronforclaude/runners/<name>.env)
+    -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>REPLACE_ME_NODE_PATH</string>
+        <string>REPLACE_ME_CRONFORCLAUDE_PATH</string>
+        <string>run</string>
+        <string>default</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!--
+          You normally do NOT need to set RUNNER_TOKEN / SCHEDULER_URL here —
+          they live in ~/.cronforclaude/runners/<profile>.env and are loaded
+          by the runner itself. Override only if you want to bypass the
+          profile file (e.g. you store secrets in macOS Keychain and inject
+          them via a wrapper script).
+
+          Uncomment + fill in to override:
+        -->
+        <!--
+        <key>RUNNER_TOKEN</key>
+        <string>REPLACE_ME_RUNNER_TOKEN</string>
+        <key>SCHEDULER_URL</key>
+        <string>https://cronforclaude.com</string>
+        -->
+
+        <!-- Ensure node + claude are on PATH for the spawned job. -->
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!--
+      Logs go to the same place the `cronforclaude daemon` flow uses, so
+      `cronforclaude daemon logs default -f` still works against a
+      launchd-managed runner. REPLACE_ME_HOME with your $HOME (launchd does
+      not expand ~ in plist paths).
+    -->
+    <key>StandardOutPath</key>
+    <string>REPLACE_ME_HOME/.cronforclaude/state/default.log</string>
+    <key>StandardErrorPath</key>
+    <string>REPLACE_ME_HOME/.cronforclaude/state/default.log</string>
+
+    <!-- Working directory; doesn't matter much, but keep it stable. -->
+    <key>WorkingDirectory</key>
+    <string>REPLACE_ME_HOME</string>
+
+    <!-- Allow up to 60s for in-flight jobs to drain on `launchctl unload`. -->
+    <key>ExitTimeOut</key>
+    <integer>60</integer>
+</dict>
+</plist>

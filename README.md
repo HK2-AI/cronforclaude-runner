@@ -104,6 +104,50 @@ sudo systemctl enable --now cronforclaude@work
 sudo journalctl -u 'cronforclaude@*' -f
 ```
 
+## Run as a macOS LaunchAgent
+
+A template plist lives at
+[`launchd/com.cronforclaude.runner.plist`](./launchd/com.cronforclaude.runner.plist).
+It runs `cronforclaude run <profile>` in the foreground under launchd, with
+`KeepAlive` for auto-restart.
+
+```sh
+# 1. Copy the template into your user LaunchAgents dir.
+cp launchd/com.cronforclaude.runner.plist \
+   ~/Library/LaunchAgents/com.cronforclaude.runner.plist
+
+# 2. Fill in the REPLACE_ME_* placeholders. You need:
+#    - REPLACE_ME_NODE_PATH           → `which node`         (must be 20+)
+#    - REPLACE_ME_CRONFORCLAUDE_PATH  → `which cronforclaude` (npm global)
+#                                       or absolute path to dist/index.js
+#    - REPLACE_ME_HOME                → your $HOME           (launchd does
+#                                       NOT expand ~)
+# Open in your editor of choice, or use sed:
+sed -i '' \
+  -e "s|REPLACE_ME_NODE_PATH|$(which node)|g" \
+  -e "s|REPLACE_ME_CRONFORCLAUDE_PATH|$(which cronforclaude)|g" \
+  -e "s|REPLACE_ME_HOME|$HOME|g" \
+  ~/Library/LaunchAgents/com.cronforclaude.runner.plist
+
+# 3. Load it (the -w flag persists across reboots).
+launchctl load -w ~/Library/LaunchAgents/com.cronforclaude.runner.plist
+
+# 4. Verify.
+launchctl list | grep cronforclaude
+tail -f ~/.cronforclaude/state/default.log
+```
+
+The template targets the `default` profile. To run a second profile under
+launchd, copy the plist with a unique `Label` (e.g. `com.cronforclaude.runner.work`),
+change the last `ProgramArguments` entry from `default` to your profile name,
+and update both `Standard*Path` lines to point at that profile's log file.
+
+To stop or unload:
+
+```sh
+launchctl unload ~/Library/LaunchAgents/com.cronforclaude.runner.plist
+```
+
 ## Environment / config layout
 
 Profiles live as plain `.env` files. Hand-edit them, or use `cronforclaude

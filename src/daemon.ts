@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import {
   DEFAULT_PROFILE,
@@ -113,6 +113,24 @@ function ensureStateDir(profile: string): void {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
+/** Cap the per-profile log file. If it's grown past 10 MB, rotate it to
+ *  `<log>.1` (atomically replacing any prior .1) so the next `openSync('a')`
+ *  starts on an empty file. Keeps exactly one previous file — no compression,
+ *  no multi-generation history; we just don't want logs filling the disk on
+ *  long-running runners. Best-effort: any error is swallowed so a transient
+ *  FS issue can't block daemon startup. */
+const LOG_MAX_BYTES = 10 * 1024 * 1024;
+function rotateLogIfLarge(logFile: string): void {
+  try {
+    if (!existsSync(logFile)) return;
+    const sz = statSync(logFile).size;
+    if (sz < LOG_MAX_BYTES) return;
+    renameSync(logFile, `${logFile}.1`); // overwrites any existing .1
+  } catch {
+    /* best-effort; if rotation fails we just keep appending */
+  }
+}
+
 export async function daemonStart(profile: string, args: string[]): Promise<void> {
   const force = args.includes("--force");
   const envFile = envPathForProfile(profile);
@@ -142,6 +160,7 @@ export async function daemonStart(profile: string, args: string[]): Promise<void
   }
 
   const logFile = statePath(profile, "log");
+  rotateLogIfLarge(logFile);
   const out = openSync(logFile, "a");
   const err = openSync(logFile, "a");
 

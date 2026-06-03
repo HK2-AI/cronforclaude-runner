@@ -43,6 +43,17 @@ export type ClaimedJob = {
   timeoutSec: number;
   dangerouslySkipPermissions: boolean;
   effort: string;
+  /** Server tells us whether this run should happen in a detached git
+   *  worktree of workingDir. Optional on the wire so older runners that
+   *  ignore the field still parse claims from a newer server. */
+  useWorktree?: boolean;
+  /** What ref the worktree starts at. Encoding:
+   *    null/undefined → current HEAD (back-compat default)
+   *    `:default`     → runner resolves repo's default branch via
+   *                     `git symbolic-ref refs/remotes/origin/HEAD`
+   *    else           → that ref, passed verbatim to `git worktree add -d`
+   *  Ignored when useWorktree is false/absent. */
+  worktreeBranch?: string | null;
 };
 
 export type JobClaim = {

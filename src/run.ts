@@ -122,6 +122,7 @@ async function tryClaim(): Promise<boolean> {
     timeoutSec: job.timeoutSec,
     dangerouslySkipPermissions: job.dangerouslySkipPermissions,
     effort: job.effort,
+    model: job.model,
     flush: async ({ stdout, stderr, liveText, events, startIdx }) => {
       try {
         const r = await api.jobLog(job.id, { stdout, stderr, liveText, events, startIdx });

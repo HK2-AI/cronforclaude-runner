@@ -100,6 +100,7 @@ export function execClaude(opts: {
   timeoutSec: number;
   dangerouslySkipPermissions?: boolean;
   effort?: string | null;
+  model?: string | null;
   flush?: FlushFn;
 }): ExecHandle {
   const start = Date.now();
@@ -110,6 +111,13 @@ export function execClaude(opts: {
   // Apply effort flag unless the user already specified one via claudeArgs.
   if (opts.effort && !extra.some((a) => a === "--effort" || a.startsWith("--effort="))) {
     extra.unshift("--effort", opts.effort);
+  }
+  // Same pattern for --model: the server-resolved value wins UNLESS the
+  // user already put a --model in claudeArgs (e.g. for testing). That
+  // hand-rolled escape hatch should keep working even after we introduce
+  // a first-class model picker.
+  if (opts.model && !extra.some((a) => a === "--model" || a.startsWith("--model="))) {
+    extra.unshift("--model", opts.model);
   }
   // Force streaming output unless the user explicitly chose another format.
   // `--verbose` is required by the CLI when `--output-format stream-json` is set.

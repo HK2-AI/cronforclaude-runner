@@ -54,6 +54,10 @@ export type ClaimedJob = {
    *    else           → that ref, passed verbatim to `git worktree add -d`
    *  Ignored when useWorktree is false/absent. */
   worktreeBranch?: string | null;
+  /** Claude model id. When set, the runner prepends `--model <id>` to
+   *  the claude argv list (unless the user already passes --model via
+   *  claudeArgs). null/undefined → no --model flag, CLI default applies. */
+  model?: string | null;
 };
 
 export type JobClaim = {
